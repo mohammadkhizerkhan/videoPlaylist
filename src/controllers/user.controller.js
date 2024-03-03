@@ -5,6 +5,7 @@ import { User } from "../models/user.model.js";
 import { deleteOnCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ACCESS_TOKEN, REFRESH_TOKEN } from "../constants/common.js";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 
 const generateTokens = async (user) => {
   try {
@@ -60,7 +61,7 @@ const registerUser = asyncHandler(async (req, res) => {
     const user = await User.create({
       username: username.toLowerCase(),
       fullName,
-      avatar: avatar.url,
+      avatar: avatar?.url ?? "",
       coverImage: coverImage?.url ?? "",
       email,
       password,
@@ -231,11 +232,12 @@ const updateUserData = asyncHandler(async (req, res) => {
     invalidUpdateFields.push(field);
     return false;
   });
+
   if (!updateAllowed) {
     throw new ApiError(400, `Cannot update ${invalidUpdateFields} fields`);
   }
 
-  if (!requestFields.fullName || !requestFields.email) {
+  if (!(requestFields.fullName || requestFields.email)) {
     throw new ApiError(400, "Please provide proper data");
   }
 
@@ -337,18 +339,68 @@ const getUserProfile = asyncHandler(async (req, res) => {
     },
     {
       $lookup: {
-        from: "subscription",
-        foreignField: "_id",
-        localField: "channel",
+        from: "subscriptions",
+        // when local field id matches the foreign key of channel, then we'll get list of subscribers subscribed to this id
+        foreignField: "channel",
+        localField: "_id",
         as: "subscribers",
+        pipeline:[
+          {
+            $lookup:{
+              from:"users",
+              foreignField:"_id",
+              localField:"subscriber",
+              as:"subscriberDetails",
+              pipeline:[
+                {
+                  $project:{
+                    username:1
+                  }
+                }
+              ]
+            }
+          },{
+            $addFields: {
+              subscriberDetails: {
+                $first: "$subscriberDetails",
+              },
+            },
+          },
+        ]
       },
     },
     {
       $lookup: {
-        from: "subscription",
-        foreignField: "_id",
-        localField: "subscriber",
+        from: "subscriptions",
+        // when local field id matches the foreign key of subscriber, then we'll get list of channels this id subscribed
+        foreignField: "subscriber",
+        localField: "_id",
         as: "subscribedTo",
+        pipeline: [
+          {
+            // we'll add another lookup to fetch the channel details , here if channel id matches the user id we'll fetch the details
+            $lookup: {
+              from: "users",
+              foreignField: "_id",
+              localField: "channel",
+              as: "channelDetails",
+              pipeline: [
+                {
+                  $project: {
+                    username: 1,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            $addFields: {
+              channelDetails: {
+                $first: "$channelDetails",
+              },
+            },
+          },
+        ],
       },
     },
     {
@@ -373,7 +425,15 @@ const getUserProfile = asyncHandler(async (req, res) => {
         fullName: 1,
         username: 1,
         subscribersCount: 1,
-        channelsSubscribedToCount: 1,
+        subscribedCount: 1,
+        "subscribers._id": 1,
+        "subscribers.createdAt": 1,
+        "subscribers.updatedAt": 1,
+        "subscribers.subscriberDetails": 1,
+        "subscribedTo._id": 1,
+        "subscribedTo.createdAt": 1,
+        "subscribedTo.updatedAt": 1,
+        "subscribedTo.channelDetails": 1,
         isSubscribed: 1,
         avatar: 1,
         coverImage: 1,
@@ -393,6 +453,60 @@ const getUserProfile = asyncHandler(async (req, res) => {
     );
 });
 
+const getWatchHistory = asyncHandler(async (req, res) => {
+  const user = await User.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(req.user._id),
+      },
+    },
+    {
+      $lookup: {
+        from: "videos",
+        localField: "watchHistory",
+        foreignField: "_id",
+        as: "watchHistory",
+        pipeline: [
+          {
+            $lookup: {
+              from: "users",
+              foreignField: "_id",
+              localField: "owner",
+              as: "owner",
+              pipeline: [
+                {
+                  $project: {
+                    fullName: 1,
+                    username: 1,
+                    avatar: 1,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            $addFields: {
+              owner: {
+                $first: "$owner",
+              },
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        user[0].watchHistory,
+        "Watch history fetched successfully"
+      )
+    );
+});
+
 export {
   registerUser,
   loginUser,
@@ -403,4 +517,6 @@ export {
   updateUserData,
   updateAvatar,
   updateCoverImage,
+  getUserProfile,
+  getWatchHistory,
 };

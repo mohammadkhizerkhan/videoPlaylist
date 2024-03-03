@@ -7,11 +7,11 @@ const commentSchema = new Schema(
       required: true,
     },
     video: {
-      type: Object.Types.objectId,
+      type: Schema.Types.ObjectId,
       ref: "Video",
     },
     owner: {
-      type: Object.Types.objectId,
+      type: Schema.Types.ObjectId,
       ref: "User",
     },
   },

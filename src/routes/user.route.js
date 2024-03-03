@@ -4,6 +4,8 @@ import { verifytoken } from "../middlewares/auth.middleware.js";
 import {
   getCurrentUserData,
   getRefreshToken,
+  getUserProfile,
+  getWatchHistory,
   loginUser,
   logoutUser,
   registerUser,
@@ -40,5 +42,7 @@ router
 router
   .route("/update-coverImage")
   .post(verifytoken, upload.single("coverImage"), updateCoverImage);
+router.route("/:username").get(verifytoken, getUserProfile);
+router.route("/history").get(verifytoken, getWatchHistory);
 
 export default router;
