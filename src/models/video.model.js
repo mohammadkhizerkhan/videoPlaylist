@@ -23,6 +23,14 @@ const videoSchema = new Schema(
       type: Number,
       required: true,
     },
+    cloudinaryVideoID: {
+      type: String,
+      required: true,
+    },
+    cloudinaryThumbnailID: {
+      type: String,
+      required: true,
+    },
     views: {
       type: Number,
       default: 0,
