@@ -6,17 +6,17 @@ class ApiError extends Error {
     stack
   ) {
     super(message);
-    // this.message = message;
+    this.message = message;
     this.statusCode = statusCode;
     this.errors = errors;
     this.success = false;
     this.data = null;
 
-    // if (stack) {
-    //   this.stack = stack;
-    // } else {
-    //   Error.captureStackTrace(this, this.constructor);
-    // }
+    if (stack) {
+      this.stack = stack;
+    } else {
+      Error.captureStackTrace(this, this.constructor);
+    }
   }
 }
 

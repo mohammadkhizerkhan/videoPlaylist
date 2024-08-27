@@ -20,71 +20,64 @@ const generateTokens = async (user) => {
 };
 
 const registerUser = asyncHandler(async (req, res) => {
-  try {
-    const { username, email, fullName, password } = req.body;
+  const { username, email, fullName, password } = req.body;
 
-    if (
-      [username, email, fullName, password].some(
-        (field) => field?.trim() === ""
-      )
-    ) {
-      throw new ApiError(400, "All fields are required missing");
-    }
-
-    const existingUser = await User.findOne({
-      $or: [{ username }, { email }],
-    });
-    if (existingUser) {
-      throw new ApiError(409, "User with same email or name already exist");
-    }
-
-    const avatarLocalPath = req?.files?.avatar[0]?.path;
-    if (!avatarLocalPath) {
-      throw new ApiError(400, "Avatar file is required");
-    }
-
-    let coverImageLocalPath;
-    if (
-      req.files &&
-      Array.isArray(req.files.coverImage) &&
-      req.files.coverImage.length > 0
-    ) {
-      coverImageLocalPath = req.files.coverImage[0].path;
-    }
-
-    const avatar = await uploadOnCloudinary(avatarLocalPath);
-    const coverImage = await uploadOnCloudinary(coverImageLocalPath);
-    if (!avatar) {
-      throw new ApiError(400, "Failed to upload Avatar file");
-    }
-
-    const user = await User.create({
-      username: username.toLowerCase(),
-      fullName,
-      avatar: avatar?.url ?? "",
-      coverImage: coverImage?.url ?? "",
-      email,
-      password,
-    });
-
-    const createdUser = await User.findById(user._id).select(
-      "-password -refreshToken"
-    );
-
-    if (!createdUser) {
-      throw new ApiError(500, "something went wrong while creating the user");
-    }
-
-    return res
-      .status(201)
-      .json(new ApiResponse(200, createdUser, "User created Successfully"));
-  } catch (error) {
-    res.status(error.statusCode).send({ message: error.message, ...error });
+  if (
+    [username, email, fullName, password].some((field) => field?.trim() === "")
+  ) {
+    throw new ApiError(400, "All fields are required missing");
   }
+
+  const existingUser = await User.findOne({
+    $or: [{ username }, { email }],
+  });
+  if (existingUser) {
+    throw new ApiError(409, "User with same email or name already exist");
+  }
+
+  const avatarLocalPath = req?.files?.avatar[0]?.path;
+  if (!avatarLocalPath) {
+    throw new ApiError(400, "Avatar file is required");
+  }
+
+  let coverImageLocalPath;
+  if (
+    req.files &&
+    Array.isArray(req.files.coverImage) &&
+    req.files.coverImage.length > 0
+  ) {
+    coverImageLocalPath = req.files.coverImage[0].path;
+  }
+
+  const avatar = await uploadOnCloudinary(avatarLocalPath);
+  const coverImage = await uploadOnCloudinary(coverImageLocalPath);
+  if (!avatar) {
+    throw new ApiError(400, "Failed to upload Avatar file");
+  }
+
+  const user = await User.create({
+    username: username.toLowerCase(),
+    fullName,
+    avatar: avatar?.url ?? "",
+    coverImage: coverImage?.url ?? "",
+    email,
+    password,
+  });
+
+  const createdUser = await User.findById(user._id).select(
+    "-password -refreshToken"
+  );
+
+  if (!createdUser) {
+    throw new ApiError(500, "something went wrong while creating the user");
+  }
+
+  return res
+    .status(201)
+    .json(new ApiResponse(200, createdUser, "User created Successfully"));
 });
 
 const loginUser = asyncHandler(async (req, res) => {
-  try {
     const { email, username, password } = req.body;
     if (!(email || username)) {
       throw new ApiError(400, "username or email is required");
@@ -120,13 +113,9 @@ const loginUser = asyncHandler(async (req, res) => {
           refreshToken,
         })
       );
-  } catch (error) {
-    res.status(error.statusCode).send({ message: error.message, ...error });
-  }
 });
 
 const logoutUser = asyncHandler(async (req, res) => {
-  try {
     await User.findByIdAndUpdate(
       req.user._id,
       {
@@ -148,13 +137,9 @@ const logoutUser = asyncHandler(async (req, res) => {
       .clearCookie(ACCESS_TOKEN, cookieConfig)
       .clearCookie(REFRESH_TOKEN, cookieConfig)
       .json(new ApiResponse(200, {}, "User Logged out"));
-  } catch (error) {
-    res.status(error.statusCode).send({ message: error.message, ...error });
-  }
 });
 
 const getRefreshToken = asyncHandler(async (req, res) => {
-  try {
     const oldRefreshToken = req.cookie.refreshToken || req.body.refreshToken;
     if (!oldRefreshToken) {
       throw new ApiError(401, "Unauthorized request");
@@ -192,9 +177,6 @@ const getRefreshToken = asyncHandler(async (req, res) => {
           refreshToken,
         })
       );
-  } catch (error) {
-    res.status(error.statusCode).send({ message: error.message, ...error });
-  }
 });
 
 const updatePassword = asyncHandler(async (req, res) => {
@@ -344,29 +326,30 @@ const getUserProfile = asyncHandler(async (req, res) => {
         foreignField: "channel",
         localField: "_id",
         as: "subscribers",
-        pipeline:[
+        pipeline: [
           {
-            $lookup:{
-              from:"users",
-              foreignField:"_id",
-              localField:"subscriber",
-              as:"subscriberDetails",
-              pipeline:[
+            $lookup: {
+              from: "users",
+              foreignField: "_id",
+              localField: "subscriber",
+              as: "subscriberDetails",
+              pipeline: [
                 {
-                  $project:{
-                    username:1
-                  }
-                }
-              ]
-            }
-          },{
+                  $project: {
+                    username: 1,
+                  },
+                },
+              ],
+            },
+          },
+          {
             $addFields: {
               subscriberDetails: {
                 $first: "$subscriberDetails",
               },
             },
           },
-        ]
+        ],
       },
     },
     {

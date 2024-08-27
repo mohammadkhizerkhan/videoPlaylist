@@ -23,6 +23,6 @@ export const verifytoken = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
-    res.status(error.statusCode).send({ message: error.message, ...error });
+    res.status(400).send({ message: error.message, ...error });
   }
 };
